@@ -34,6 +34,7 @@ function DHT (opts) {
 
   this._secrets = null
   this._hash = opts.hash || sha1
+  this.magic = opts.magic || 'local'
   this._hashLength = this._hash(Buffer.from('')).length
   this._rpc = opts.krpc || krpc(Object.assign({idLength: this._hashLength}, opts))
   this._rpc.on('query', onquery)
@@ -55,7 +56,7 @@ function DHT (opts) {
   this.destroyed = false
   this.nodeId = this._rpc.id
   this.nodes = this._rpc.nodes
-
+  //self._debug('DHT  %s', JSON.stringify(opts))
   // ensure only *one* ping it running at the time to avoid infinite async
   // ping recursion, and make the latest one is always ran, but inbetween ones
   // are disregarded
@@ -74,22 +75,22 @@ function DHT (opts) {
     var older = opts.older
     var swap = opts.swap
 
-    self._debug('received ping', older)
+     self._debug('received ping', older)
     self._checkNodes(older, false, function (_, deadNode) {
       if (deadNode) {
-        self._debug('swaping dead node with newer', deadNode)
+         self._debug('swaping dead node with newer', deadNode)
         swap(deadNode)
         return cb()
       }
 
-      self._debug('no node added, all other nodes ok')
+       self._debug('no node added, all other nodes ok')
       cb()
     })
   }
 
   function onlistening () {
     self.listening = true
-    self._debug('listening %d', self.address().port)
+     self._debug('listening %d', self.address().port)
     self.updateBucketTimestamp()
     self._setBucketCheckInterval()
     self.emit('listening')
@@ -422,7 +423,7 @@ DHT.prototype.announce = function (infoHash, port, cb) {
   if (!table) return this._preannounce(infoHash, port, cb)
 
   if (this._host) {
-    var dhtPort = this.listening ? this.address().port : 0
+    var dhtPort =this.address().port // this.listening ? this.address().port : 0
     this._addPeer(
       {host: this._host, port: port || dhtPort},
       infoHash,
@@ -699,7 +700,7 @@ DHT.prototype._closest = function (target, message, onmessage, cb) {
   function done (err, n) {
     if (err) return cb(err)
     self._tables.set(target.toString('hex'), table)
-    self._debug('visited %d nodes', n)
+     self._debug('visited %d nodes', n)
     cb(null, n)
   }
 
@@ -707,7 +708,7 @@ DHT.prototype._closest = function (target, message, onmessage, cb) {
     if (!message.r) return true
 
     if (message.r.token && message.r.id && Buffer.isBuffer(message.r.id) && message.r.id.length === self._hashLength) {
-      self._debug('found node %s (target: %s)', message.r.id, target)
+       self._debug('found node %s (target: %s)', message.r.id, target)
       table.add({
         id: message.r.id,
         host: node.host || node.address,

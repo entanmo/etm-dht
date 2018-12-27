@@ -27,7 +27,7 @@ function RPC (opts) {
   this.backgroundConcurrency = opts.backgroundConcurrency || (this.concurrency / 4) | 0
   this.k = opts.k || K
   this.destroyed = false
-
+  this.magic = opts.magic
   this.pending = []
   this.nodes = null
 
@@ -63,15 +63,29 @@ function RPC (opts) {
   }
 
   function onquery (query, peer) {
+   // console.log(JSON.stringify(query.a.magic.toString()))
+    if(query.a.magic.toString()!= self.magic){
+      console.log('onquery wrong net work ')
+      return
+    }
     addNode(query.a, peer)
     self.emit('query', query, peer)
   }
 
   function onresponse (reply, peer) {
+    //console.log('onresponse '+JSON.stringify(reply))
+    if(reply.r.magic.toString() != self.magic ){
+      console.log('onresponse wrong net work ')
+      return
+    }
     addNode(reply.r, peer)
   }
 
   function onbroadcast (message, peer) {
+    if(message.magic != self.magic){
+      console.log('wrong net work ')
+      return
+    }
     addNode(message, peer)
     self.emit('broadcast', message, peer)
     if (message.recursive) {
@@ -111,6 +125,7 @@ RPC.prototype.response = function (node, query, response, nodes, cb) {
   }
 
   if (!response.id) response.id = this.id
+  if (!response.magic) response.magic = this.magic
   if (nodes) response.nodes = encodeNodes(nodes, this._idLength)
   this.socket.response(node, query, response, cb)
 }
@@ -131,7 +146,7 @@ RPC.prototype.address = function () {
 RPC.prototype.queryAll = function (nodes, message, visit, cb) {
   if (!message.a) message.a = {}
   if (!message.a.id) message.a.id = this.id
-
+  if (!message.a.magic) message.a.magic = this.magic
   var stop = false
   var missing = nodes.length
   var hits = 0
@@ -159,6 +174,7 @@ RPC.prototype.query = function (node, message, cb) {
   } else {
     if (!message.a) message.a = {}
     if (!message.a.id) message.a.id = this.id
+    if (!message.a.magic) message.a.magic = this.magic
     if (node.token) message.a.token = node.token
     this.socket.query(node, message, cb)
   }
@@ -193,6 +209,7 @@ RPC.prototype.broadcast = function (message) {
   const peers = this.nodes.toArray()
   if (!message.mid) message.mid = uuidv4()
   message.id = this.id
+  message.magic = this.magic
   for (let i = 0; i < K && i < peers.length; ++i) {
     const rnd = Math.floor(Math.random() * peers.length)
     const peer = peers[rnd]
@@ -226,7 +243,7 @@ RPC.prototype._closest = function (target, message, background, visit, cb) {
 
   if (!message.a) message.a = {}
   if (!message.a.id) message.a.id = this.id
-
+  if (!message.a.magic) message.a.magic = this.magic
   var table = new KBucket({
     localNodeId: target,
     numberOfNodesPerKBucket: this.k,
