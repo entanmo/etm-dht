@@ -64,7 +64,7 @@ function RPC (opts) {
 
   function onquery (query, peer) {
    // console.log(JSON.stringify(query.a.magic.toString()))
-    if(query.a.magic.toString()!= self.magic){
+    if(!query.a.magic || query.a.magic.toString()!= self.magic){
       console.log('onquery wrong net work ')
       return
     }
@@ -74,7 +74,7 @@ function RPC (opts) {
 
   function onresponse (reply, peer) {
     //console.log('onresponse '+JSON.stringify(reply))
-    if(reply.r.magic.toString() != self.magic ){
+    if(!reply.r.magic || reply.r.magic.toString() != self.magic ){
       console.log('onresponse wrong net work ')
       return
     }
@@ -82,7 +82,7 @@ function RPC (opts) {
   }
 
   function onbroadcast (message, peer) {
-    if(message.magic != self.magic){
+    if(!message.magic ||message.magic != self.magic){
       console.log('wrong net work ')
       return
     }
