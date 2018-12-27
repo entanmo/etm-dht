@@ -35,6 +35,7 @@ function DHT (opts) {
   this._secrets = null
   this._hash = opts.hash || sha1
   this.magic = opts.magic || 'local'
+  this.peerPort = opts.peerPort
   this._hashLength = this._hash(Buffer.from('')).length
   this._rpc = opts.krpc || krpc(Object.assign({idLength: this._hashLength}, opts))
   this._rpc.on('query', onquery)
@@ -423,7 +424,7 @@ DHT.prototype.announce = function (infoHash, port, cb) {
   if (!table) return this._preannounce(infoHash, port, cb)
 
   if (this._host) {
-    var dhtPort =this.address().port // this.listening ? this.address().port : 0
+    var dhtPort =  this.listening ? this.address().port : this.peerPort
     this._addPeer(
       {host: this._host, port: port || dhtPort},
       infoHash,
