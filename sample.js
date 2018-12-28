@@ -16,8 +16,8 @@ function main() {
     ]
   })
   
-  dht.listen(port, () => {
-    console.log('now listening on:', port)
+  dht.listen(port,() => {
+    console.log('now listening on:', port ,dht.address())
   })
 
   dht.on('node', (node) => {
