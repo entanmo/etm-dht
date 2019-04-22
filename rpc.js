@@ -30,6 +30,7 @@ function RPC (opts) {
   this.magic = opts.magic
   this.pending = []
   this.nodes = null
+  this.bannedSet = new Set()
 
   this.socket.setMaxListeners(0)
   this.socket.on('query', onquery)
@@ -62,29 +63,48 @@ function RPC (opts) {
     self.emit('warning', err)
   }
 
+  function onbanned_message(peer, type, message ) {
+    self.emit('banned_message', peer, type, message)
+  }
+
   function onquery (query, peer) {
     if(!query.a.magic || query.a.magic.toString()!= self.magic){
-      console.log('onquery wrong net work ')
+      console.log('onquery wrong net work '+JSON.stringify(peer))
       return
     }
+    const ip = peer.host || peer.address
+    if (self.bannedSet.has(ip)) {
+      return onbanned_message(peer, 'query', query)
+    }
+
     addNode(query.a, peer)
     self.emit('query', query, peer)
   }
 
   function onresponse (reply, peer) {
     if(!reply.r.magic || reply.r.magic.toString() != self.magic ){
-      console.log('onresponse wrong net work ')
+      console.log('onresponse wrong net work '+JSON.stringify(peer))
       return
     }
+    const ip = peer.host || peer.address
+    if (self.bannedSet.has(ip)) {
+      return onbanned_message(peer, 'response', reply )
+    }
+
     addNode(reply.r, peer)
   }
 
   function onbroadcast (message, peer) {
-   // console.log('onbroadcast '+JSON.stringify(message.magic )+JSON.stringify(self.magic))
+    // console.log('onbroadcast '+JSON.stringify(message.magic )+JSON.stringify(self.magic))
     if(!message.magic ||message.magic != self.magic){
       console.log('wrong net work ')
       return
     }
+    const ip = peer.host || peer.address
+    if (self.bannedSet.has(ip)) {
+      return onbanned_message(peer, 'boradcast', message )
+    }
+
     addNode(message, peer)
     self.emit('broadcast', message, peer)
     if (message.recursive) {
@@ -115,6 +135,22 @@ util.inherits(RPC, events.EventEmitter)
 RPC.prototype.removeNode = function (id, reason) {
   this.nodes.remove(id)
   this.emit('remove', id, reason)
+}
+
+RPC.prototype.ban = function (...ips) {
+  for( let ip of ips) {
+    if (!this.bannedSet.has(ip)) {
+      this.bannedSet.add(ip)
+    }
+  }
+
+  this.nodes.toArray()
+    .filter(n => ips.includes(n.host))
+    .forEach(n => this.removeNode(n.id, `ban node ${n.host}:${n.port}` ))
+}
+
+RPC.prototype.unban = function (ip) {
+  if (this.bannedSet.has(ip)) this.bannedSet.delete(ip)
 }
 
 RPC.prototype.response = function (node, query, response, nodes, cb) {
@@ -196,6 +232,10 @@ RPC.prototype.clear = function () {
   this.nodes.on('ping', onping)
 
   function onping (older, newer) {
+    const ip = newer.host || newer.address
+    if (self.bannedSet.has(ip)) {
+      return onbanned_message(newer, 'ping' )
+    }
     self.emit('ping', older, function swap (deadNode) {
       if (!deadNode) return
       if (deadNode.id) self.removeNode(deadNode.id, new Error('k-bucket ping dead node'))
@@ -222,7 +262,8 @@ RPC.prototype.broadcast = function (message, peers) {
   if (!message.mid) message.mid = uuidv4()
   message.id = this.id
   message.magic = this.magic
-  peers = Array.isArray(peers) && peers.length > 0 ? peers : getRandomPeers(K, this.nodes.toArray())
+  peers = Array.isArray(peers) && peers.length > 0 ? peers : 
+    getRandomPeers(K, this.nodes.toArray().filter(n => !this.bannedSet.has(n.host)))
   for(let peer of peers) {
      this.socket.notify(peer, message)
   }

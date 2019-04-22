@@ -48,6 +48,7 @@ function DHT (opts) {
   this._rpc.on('error', onerror)
   this._rpc.on('listening', onlistening)
   this._rpc.on('remove', onremove)
+  this._rpc.on('banned_message', onbanned_message)
   this._rotateSecrets()
   this._verify = opts.verify || null
   this._host = opts.host || null
@@ -133,6 +134,10 @@ function DHT (opts) {
   function onremove(id, reason) {
     self.emit('remove', id.toString('hex'), reason)
   }
+
+  function onbanned_message(peer, type, message) {
+    self.emit('banned_message', peer, type, message)
+  } 
 
   setInterval(this._discoverPeers.bind(this), DISCOVER_PEERS_INTERVAL)
 }
@@ -349,6 +354,9 @@ DHT.prototype._checkNodes = function (nodes, force, cb) {
 
 DHT.prototype.addNode = function (node) {
   var self = this
+  if (this._rpc.bannedSet.has(node.host)) {
+    return false
+  }
   if (node.id) {
     node.id = toBuffer(node.id)
     var old = !!this._rpc.nodes.get(node.id)
@@ -561,7 +569,7 @@ DHT.prototype.announce = function (infoHash, port, cb) {
   if (!table) return this._preannounce(infoHash, port, cb)
 
   if (this._host) {
-    var dhtPort =  this.listening ? this.address().port : this.peerPort
+    var dhtPort = this.listening ? this.address().port :  this.peerPort
     this._addPeer(
       {host: this._host, port: port || dhtPort},
       infoHash,
@@ -628,6 +636,18 @@ DHT.prototype.lookup = function (infoHash, cb) {
 
 DHT.prototype.broadcast = function (message, peers) {
   this._rpc.broadcast(message, peers)
+}
+
+DHT.prototype.bannedIPs = function () {
+  return [...this._rpc.bannedSet]
+}
+
+DHT.prototype.ban = function (...ips) {
+  this._rpc.ban(...ips)
+}
+
+DHT.prototype.unban = function (ip) {
+  this._rpc.unban(ip)
 }
 
 DHT.prototype.address = function () {
